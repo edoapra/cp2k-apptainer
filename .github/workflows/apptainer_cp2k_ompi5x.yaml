@@ -90,14 +90,12 @@ jobs:
     - name: create sif from docker
       run: |
         if [  -f ~/cache/ubuntu_jammy.sif ]; then echo "sif found" ; \
-           cp ~/cache/ubuntu_jammy.sif ${{ matrix.folder }}/.
+           cp ~/cache/ubuntu_jammy.sif .
         else
-           cd ${{ matrix.folder }} ;\
-        apptainer pull docker://ubuntu:jammy ; \
+           apptainer pull docker://ubuntu:jammy ; \
         fi
     - name: build an apptainer container
       run: |
-        cd ${{ matrix.folder }}
         MYUSERNAME=${{ github.actor}} GPU=${{ matrix.gpu}}  ELPA=${{ matrix.elpa}} OMPI=${{ matrix.ompi }} apptainer build --fakeroot cp2k.simg   2024.2_openmpi_skylake-avx512_psmp.def
     - name: builddate
       id: build-date
@@ -124,7 +122,6 @@ jobs:
       if: ${{ env.push_truefalse == 'true' }}
       run: |
         mkdir -p ~/cache || true
-        cd ${{ matrix.folder }}
         apptainer exec cp2k.img cp -r /opt/ompi ~/cache
         apptainer exec cp2k.img tar cjf ~/cache/libint.tar.bz2 /opt/install/exachem/include/libint2/  /opt/install/exachem/include/libint2.hpp /opt/install/exachem/include/libint2.h  /opt/install/exachem/share/libint /opt/install/exachem/lib/cmake/libint2 /opt/install/exachem/lib/libint2.a  /opt/install/exachem/lib/pkgconfig/libint2.pc || true
         cp ubuntu_jammy.sif ~/cache/.
