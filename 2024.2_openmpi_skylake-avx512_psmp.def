@@ -109,7 +109,7 @@ cd /opt/cp2k/tools/toolchain
 --with-cusolvermp=no \
 --with-gcc=system \
 --with-elpa \
---with-openmpi "
+--with-openmpi=system "
 
 # Build CP2K for target CPU skylake-avx512
 mkdir -p /opt/cp2k
