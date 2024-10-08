@@ -96,7 +96,7 @@ jobs:
         fi
     - name: build an apptainer container
       run: |
-        MYUSERNAME=${{ github.actor}} GPU=${{ matrix.gpu}}  ELPA=${{ matrix.elpa}} OMPI=${{ matrix.ompi }} apptainer build --fakeroot cp2k.simg   2024.2_openmpi_skylake-avx512_psmp.def
+        MYUSERNAME=${{ github.actor}} GPU=${{ matrix.gpu}}  ELPA=${{ matrix.elpa}} OMPI=${{ matrix.ompi }} apptainer build --fakeroot cp2k.img   2024.2_openmpi_skylake-avx512_psmp.def
     - name: builddate
       id: build-date
       run: |
