@@ -1,0 +1,161 @@
+name: exachem_cp2k_ompi5x
+
+on:
+  schedule:
+    - cron: '0 0 * * SUN'
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build_image:
+    runs-on: ubuntu-22.04
+    strategy:
+        fail-fast: false
+        matrix:
+          cp2kversion:
+            2024.2
+          ompi:
+            - 5.0.5
+          elpa:
+            - N
+    steps:
+    - name: exachem version tag
+      run: |
+        myversion=.ompi-${{ matrix.ompi }}
+        if [[ ${{ matrix.elpa }} ==  Y ]]; then
+          echo "elpa=.elpa" >> $GITHUB_ENV
+        fi
+    - name: tag
+      run: |
+        echo "tag=oras://ghcr.io/${{ github.repository }}/apptainer${{ env.cp2kversion}}${{ env.elpa}}" >> $GITHUB_ENV
+    - name: echo-tag
+      run: |
+        echo ' the apptainer tag is ' '${{ env.tag }}'
+    - name: Checkout image source
+      uses: actions/checkout@v4
+      with:
+        clean: false
+    - name: pkg cleanup
+      run: |
+        df -h
+        if [[ $(uname -s) == "Linux" ]]; then
+        ubuntu_ver=$(cat /etc/os-release | grep VERSION_ID |cut -d \" -f 2)
+        dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n
+        sudo apt-get purge -y azure-cli || true
+        sudo apt-get purge -y google-cloud-cli microsoft-edge-stable dotnet-sdk-7.0 dotnet-sdk-6.0 google-chrome-stable firefox
+        sudo apt-get purge -y temurin-17-jdk temurin-11-jdk temurin-8-jdk
+        if [[ $ubuntu_ver == "20.04" ]]; then
+        sudo apt-get purge -y llvm-12-dev llvm-11-dev llvm-10-dev
+        sudo apt-get purge -y hhvm
+        sudo apt-get purge -y libgl1-mesa-dri
+        fi
+        if [[ $ubuntu_ver == "22.04" ]]; then
+        sudo apt-get purge -y llvm-13-dev llvm-14-dev llvm-15-dev
+        fi
+        sudo apt-get -y clean
+        sudo apt-get autoremove -y 
+        dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n
+        df -h
+        fi
+      shell: bash
+    - name: Setup cache
+      id: setup-cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/cache
+        key: cp2kcache-v001
+    - name: fetch cache
+      if: steps.setup-cache.outputs.cache-hit == 'true'
+      run: |
+        ls -lart ~/cache
+        if [[ -f ~/cache/ompi/lib/libmpi.so ]]; then \
+        echo "ompi cache present" ; \
+        fi
+        if [[ -f ~/cache/libint.tar.bz2 ]]; then \
+        echo "libint cache present" ; \
+        fi
+    - name: Install apptainer
+      env:
+        APP_VER: 1.2.3
+      run: |
+        sudo apt-get install -y  libfuse2 libseccomp2 zlib1g uidmap squashfs-tools squashfuse fuse2fs fuse-overlayfs fakeroot
+        wget -q  https://github.com/apptainer/apptainer/releases/download/v${APP_VER}/apptainer_${APP_VER}_amd64.deb 
+        sudo dpkg -i apptainer_${APP_VER}_amd64.deb
+        which apptainer
+        apptainer version
+    - name: create sif from docker
+      run: |
+        if [  -f ~/cache/ubuntu_jammy.sif ]; then echo "sif found" ; \
+           cp ~/cache/ubuntu_jammy.sif ${{ matrix.folder }}/.
+        else
+           cd ${{ matrix.folder }} ;\
+        apptainer pull docker://ubuntu:jammy ; \
+        fi
+    - name: build an apptainer container
+      run: |
+        cd ${{ matrix.folder }}
+        MYUSERNAME=${{ github.actor}} GPU=${{ matrix.gpu}}  ELPA=${{ matrix.elpa}} OMPI=${{ matrix.ompi }} apptainer build --fakeroot cp2k.simg   2024.2_openmpi_skylake-avx512_psmp.def
+    - name: builddate
+      id: build-date
+      run: |
+        echo "date=$(TZ=America/Los_Angeles date +%Y%m%d_%H%M%S)" >> $GITHUB_ENV
+    - name: push to ghcr.io
+      run: |
+        echo ${{ secrets.GITHUB_TOKEN }} | apptainer remote login -u ${{ github.actor }} --password-stdin oras://ghcr.io
+        apptainer remote list
+        exit_code=0
+        tries=0 ; until [ "$tries" -ge 3 ] ; do \
+        apptainer push cp2k.img ${{ env.tag }}:${{ env.date }} && break ;\
+        tries=$((tries+1)) ; echo attempt no.  $tries    ; sleep 30 ;  done
+        tries=0 ; until [ "$tries" -ge 3 ] ; do \
+        apptainer push cp2k.img ${{ env.tag }}:latest|| exit_code+=$? && break ;\
+        tries=$((tries+1)) ; echo attempt no.  $tries    ; sleep 30 ;  done
+        if [[ $exit_code == 0 ]]; then
+        echo "push_truefalse=true" >> $GITHUB_ENV
+        else
+        echo "push_truefalse=false" >> $GITHUB_ENV
+        fi
+      shell: bash
+    - name: store cache
+      if: ${{ env.push_truefalse == 'true' }}
+      run: |
+        mkdir -p ~/cache || true
+        cd ${{ matrix.folder }}
+        apptainer exec cp2k.img cp -r /opt/ompi ~/cache
+        apptainer exec cp2k.img tar cjf ~/cache/libint.tar.bz2 /opt/install/exachem/include/libint2/  /opt/install/exachem/include/libint2.hpp /opt/install/exachem/include/libint2.h  /opt/install/exachem/share/libint /opt/install/exachem/lib/cmake/libint2 /opt/install/exachem/lib/libint2.a  /opt/install/exachem/lib/pkgconfig/libint2.pc || true
+        cp ubuntu_jammy.sif ~/cache/.
+        echo "cache stored"
+        ls -l ~/cache
+    - name: ldd check
+      if: ${{ env.push_truefalse == 'true' }}
+      run: |
+        pwd
+        ls -la
+        apptainer pull -F ${{ env.tag }}:${{ env.date }}
+        export UCX_TLS=tcp,self
+        export UCX_POSIX_USE_PROC_LINK=n
+        export MPIRUN_NPOPT="-x UCX_POSIX_USE_PROC_LINK=n -x UCX_TLS=tcp,self -n"
+        sudo apt-get install -y openmpi-bin openmpi-common libopenmpi-dev
+        which mpirun
+        ldd `which mpirun`
+        apptainer exec ${{ env.tag }}:latest ldd /usr/local/bin/cp2k
+    - name: test cpu image with apptainer
+      if: ${{ (env.push_truefalse == 'true') && (matrix.gpu == 'cpu') }}
+      run: |
+        pwd
+        ls -la
+        apptainer pull -F ${{ env.tag }}:${{ env.date }}
+        export UCX_TLS=tcp,self
+        export UCX_POSIX_USE_PROC_LINK=n
+        sudo apt-get install -y openmpi-bin openmpi-common libopenmpi-dev
+        which mpirun
+        ldd `which mpirun`
+        wger https://raw.githubusercontent.com/cp2k/cp2k/refs/heads/master/tests/ATOM/regtest-1/He.inp
+        APPTAINERENV_OMPI_MCA_btl_vader_single_copy_mechanism=none \
+        OMPI_MCA_btl_vader_single_copy_mechanism=none \
+        mpirun -np 2 apptainer exec ${{ env.tag }}:${{ env.date }} \
+        /usr/local/bin/cp2k -i  He.inp ||true

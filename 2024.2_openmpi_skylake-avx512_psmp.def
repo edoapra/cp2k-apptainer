@@ -1,0 +1,207 @@
+Bootstrap: docker
+From: ubuntu:22.04 
+Stage: build
+
+%post
+#
+# This file was created by generate_docker_files.py
+#
+# Usage: docker build -f ./2024.2_openmpi_skylake-avx512_psmp.Dockerfile -t cp2k/cp2k:2024.2_openmpi_skylake-avx512_psmp .
+
+# Stage 1: build step
+
+
+# Install packages required for the CP2K toolchain build
+apt-get update -qq && apt-get install -qq --no-install-recommends \
+g++ gcc gfortran openssh-client python3 \
+bzip2 ca-certificates git make patch pkg-config unzip wget zlib1g-dev
+
+# install OpenMPI
+export OMPI=5.0.5 \
+&& export OMPI_DIR=/opt/ompi\
+&& export PATH=$OMPI_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+&& export LD_LIBRARY_PATH=$OMPI_DIR/lib \
+&& export DEBIAN_FRONTEND=noninteractive \
+&& export ucx=1.14.1 \
+&& export FC=gfortran \
+&& echo OMPI is $OMPI \
+&& export ompi_prefix=openmpi-$OMPI\
+&& echo ompi_prefix is $ompi_prefix \
+&& export ompi_major=$(echo $OMPI | cut -d . -f1) \
+&& echo ompi_major is $ompi_major \
+&& export ompi_minor=$(echo $OMPI | cut -d . -f2) \
+&& echo ompi_minor is $ompi_minor \
+&& echo ompi_major is $ompi_major \
+&& echo v"$ompi_major"."$ompi_minor"/openmpi-"$OMPI".tar.gz \
+&& if [ $ompi_major = '5' ]; then
+    export ompi_options=' --with-pmix --with-pmix-libdir=/usr/lib/x86_64-linux-gnu --enable-mca-no-build=coll-han '
+else
+    export ompi_options=' --with-pmi --with-pmi-libdir=/usr/lib/x86_64-linux-gnu --without-verbs '
+fi \
+&& echo ompi_options $ompi_options \
+&& pwd \
+&& apt-get -y update \
+&& apt-get -y install -y tzdata git moreutils  wget rsync  sudo ca-certificates \
+&& apt-get -y install -y   tar libnl-3-200 libnl-route-3-200 libgomp1 libnuma1 \
+ g++ gfortran   make ssh patch   unzip perl-base file \
+ python3 python3-dev cmake  unzip zip perl automake libtool autoconf flex  \
+ libnuma-dev libslurm-dev \
+libpmix-bin libpmix-dev libpmix2 \
+libpmi2-0-dev libpmi0-dev  \
+ libnl-3-dev  libnl-route-3-dev udev \
+ librdmacm-dev librdmacm1 rdma-core libibverbs-dev  ibverbs-providers  \
+ libhwloc-dev \
+ pkg-config gawk  software-properties-common \
+&& if [ $ompi_major = '5' ]; then
+    apt-get -y install -y libpmix-bin libpmix-dev libpmix2
+else
+    apt-get -y install -y libpmi2-0-dev libpmi0-dev
+fi \
+&& apt-get clean \
+&& echo TTTTT \
+&& df -h \
+&& $FC -v \
+&& wget --progress=dot:giga  https://github.com/openucx/ucx/releases/download/v$ucx/ucx-$ucx.tar.gz -O - | tar xzf - \
+&& cd ucx-$ucx \
+&& wget https://raw.githubusercontent.com/edoapra/nwchem-singularity/master/nwchem-dev.ompi41x.ifx/ucx_malloc.patch \
+&& patch -p0 < ./ucx_malloc.patch \
+&& mkdir build && cd build \
+&& ../configure --prefix=$OMPI_DIR --disable-logging --disable-debug --disable-assertions --disable-params-check \
+&& make -j4 && make install \
+&& if [ ! -f $OMPI_DIR/bin/ucx_info ]; then echo ucx_info\ not\ found ; exit 1 ; fi \
+&& cd ../.. \
+&& echo v'$ompi_major'.'$ompi_minor'/openmpi-'$OMPI'.tar.gz \
+&& wget  --progress=dot:giga https://download.open-mpi.org/release/open-mpi/v"$ompi_major"."$ompi_minor"/openmpi-"$OMPI".tar.gz  -O - | tar xzf -   \
+&& cd $ompi_prefix                                                        && \
+./configure  --prefix=$OMPI_DIR --with-ucx=$OMPI_DIR --enable-mca-no-build=btl-uct   \
+$ompi_options \
+--enable-mpi1-compatibility --with-slurm --without-tm --without-lsf  \
+ --without-sge --without-alps --without-lustre --disable-memchecker \
+ --without-hcoll --disable-static  \
+ --disable-mpi-java --enable-dlopen --without-cuda  \
+  FC=$FC \
+&& head config.log \
+&& make FC=$FC -j 6                                                  \
+&& make install                  \
+&& if [ ! -f $OMPI_DIR/bin/mpif90 ]; then echo mpif90\ not\ found ; exit 1 ; fi \
+&& echo mpif90 show is $($OMPI_DIR/bin/mpif90 -show) \
+&& cd .. ; rm -rf *tar*gz openmpi-* ucx-*  \
+&& echo ' check ucx' \
+&& if [ ! -f $OMPI_DIR//bin/ucx_info ]; then echo ucx_info\ not\ found ; exit 1 ; fi \
+&& echo ' /opt/ompi/bin/ucx_info -v ' `/opt/ompi/bin/ucx_info -v|| true` \
+&& echo ' ucx Transports' `/opt/ompi/bin/ucx_info  -d |grep Transport |cut -c 19- || true` \
+&& if [ ! -f $OMPI_DIR/bin/mpif90 ]; then echo mpif90\ not\ found ; exit 1 ; fi \
+&& echo '********'  \
+&& export PATH=$OMPI_DIR/bin:$PATH\
+&& export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+
+# Download CP2K
+git clone --recursive -b support/v2024.2 https://github.com/cp2k/cp2k.git /opt/cp2k
+
+# Build CP2K toolchain for target CPU skylake-avx512
+mkdir -p /opt/cp2k/tools/toolchain
+cd /opt/cp2k/tools/toolchain
+/bin/bash -c -o pipefail \
+"./install_cp2k_toolchain.sh -j 8 \
+--install-all \
+--enable-cuda=no --with-deepmd=no \
+--target-cpu=skylake-avx512 \
+--with-cusolvermp=no \
+--with-gcc=system \
+--with-elpa \
+--with-openmpi 
+
+# Build CP2K for target CPU skylake-avx512
+mkdir -p /opt/cp2k
+cd /opt/cp2k
+/bin/bash -c -o pipefail \
+"cp ./tools/toolchain/install/arch/local.psmp ./arch/; \
+source ./tools/toolchain/install/setup; \
+make -j 8 ARCH=local VERSION=psmp"
+
+# Collect components for installation and remove symbolic links
+/bin/bash -c -o pipefail \
+"mkdir -p /toolchain/install /toolchain/scripts; \
+for libdir in \$(ldd ./exe/local/cp2k.psmp | \
+grep /opt/cp2k/tools/toolchain/install | \
+awk '{print \$3}' | cut -d/ -f7 | \
+sort | uniq) setup; do \
+cp -ar /opt/cp2k/tools/toolchain/install/\${libdir} /toolchain/install; \
+done; \
+cp /opt/cp2k/tools/toolchain/scripts/tool_kit.sh /toolchain/scripts; \
+unlink ./exe/local/cp2k.popt; \
+unlink ./exe/local/cp2k_shell.psmp"
+
+# Stage 2: install step
+
+
+Bootstrap: docker
+From: ubuntu:22.04 
+Stage: install
+
+%files from build
+/opt/cp2k/exe/local/ /opt/cp2k/exe/local/
+/opt/cp2k/tests/ /opt/cp2k/tests/
+/opt/cp2k/tools/regtesting/ /opt/cp2k/tools/regtesting/
+/opt/cp2k/src/grid/sample_tasks/ /opt/cp2k/src/grid/sample_tasks/
+/opt/cp2k/data/ /opt/cp2k/data/
+/toolchain/ /opt/cp2k/tools/toolchain/
+%labels
+author="CP2K Developers" 
+cp2k_version="2024.2" 
+dockerfile_generator_version="0.2"
+%post
+
+# Install required packages
+apt-get update -qq && apt-get install -qq --no-install-recommends \
+g++ gcc gfortran openssh-client python3 && rm -rf /var/lib/apt/lists/*
+
+# Install CP2K binaries
+
+# Install CP2K regression tests
+
+# Install CP2K database files
+
+# Install shared libraries required by the CP2K binaries
+
+# Create links to CP2K binaries
+/bin/bash -c -o pipefail \
+"for binary in cp2k dumpdcd graph xyz2dcd; do \
+ln -sf /opt/cp2k/exe/local/\${binary}.psmp \
+/usr/local/bin/\${binary}; \
+done; \
+ln -sf /opt/cp2k/exe/local/cp2k.psmp \
+/usr/local/bin/cp2k_shell; \
+ln -sf /opt/cp2k/exe/local/cp2k.psmp \
+/usr/local/bin/cp2k.popt"
+
+# Create entrypoint script file
+printf "#!/bin/bash\n\
+ulimit -c 0 -s unlimited\n\
+\
+export OMPI_ALLOW_RUN_AS_ROOT=1\n\
+export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1\n\
+export OMPI_MCA_btl_vader_single_copy_mechanism=none\n\
+export OMP_STACKSIZE=16M\n\
+export PATH=/opt/cp2k/exe/local:\${PATH}\n\
+source /opt/cp2k/tools/toolchain/install/setup\n\
+\"\$@\"" \
+>/usr/local/bin/entrypoint.sh && chmod 755 /usr/local/bin/entrypoint.sh
+
+# Create shortcut for regression test
+printf "/opt/cp2k/tests/do_regtest.py --mpiexec \"mpiexec --bind-to none\" --maxtasks 8 --workbasedir /mnt \$* local psmp" \
+>/usr/local/bin/run_tests && chmod 755 /usr/local/bin/run_tests
+
+# Define entrypoint
+mkdir -p /mnt
+cd /mnt
+
+# Label docker image
+
+# EOF
+%runscript
+cd /mnt
+exec /usr/local/bin/entrypoint.sh cp2k --help "$@"
+%startscript
+cd /mnt
+exec /usr/local/bin/entrypoint.sh cp2k --help "$@"
