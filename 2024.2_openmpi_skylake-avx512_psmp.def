@@ -146,7 +146,7 @@ Stage: install
 /opt/cp2k/src/grid/sample_tasks/ /opt/cp2k/src/grid/sample_tasks/
 /opt/cp2k/data/ /opt/cp2k/data/
 /toolchain/ /opt/cp2k/tools/toolchain/
-/opt/ompi/b /opt/ompi/
+/opt/ompi/ /opt/ompi/
 %labels
 author="CP2K Developers" 
 cp2k_version="2024.2" 
