@@ -14,7 +14,7 @@ Stage: build
 # Install packages required for the CP2K toolchain build
 apt-get update -qq && apt-get install -qq --no-install-recommends \
 g++ gcc gfortran openssh-client python3 \
-bzip2 ca-certificates git make patch pkg-config unzip wget zlib1g-dev
+bzip2 ca-certificates git make patch pkg-config unzip wget zlib1g-dev rsync
 
 # install OpenMPI
 export OMPI=5.0.5 \
