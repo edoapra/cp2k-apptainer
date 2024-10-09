@@ -155,7 +155,7 @@ dockerfile_generator_version="0.2"
 
 # Install required packages
 apt-get update -qq && apt-get install -qq --no-install-recommends \
-libhwloc15 librdmacm1 libnuma1 libevent-core-2.1-7 libibverbs1 libslurm37 libgfortran5 \
+libhwloc15 librdmacm1 libnuma1 libevent-core-2.1-7 libevent-pthreads-2.1-7 libibverbs1 libslurm37 libgfortran5 \
 g++ gcc gfortran openssh-client python3 && rm -rf /var/lib/apt/lists/*
 
 # Install CP2K binaries
