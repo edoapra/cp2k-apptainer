@@ -146,6 +146,7 @@ Stage: install
 /opt/cp2k/src/grid/sample_tasks/ /opt/cp2k/src/grid/sample_tasks/
 /opt/cp2k/data/ /opt/cp2k/data/
 /toolchain/ /opt/cp2k/tools/toolchain/
+/opt/ompi/b /opt/ompi/
 %labels
 author="CP2K Developers" 
 cp2k_version="2024.2" 
@@ -183,7 +184,8 @@ export OMPI_ALLOW_RUN_AS_ROOT=1\n\
 export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1\n\
 export OMPI_MCA_btl_vader_single_copy_mechanism=none\n\
 export OMP_STACKSIZE=16M\n\
-export PATH=/opt/cp2k/exe/local:\${PATH}\n\
+export PATH=/opt/cp2k/exe/local:/opt/ompi/bin:\${PATH}\n\
+export LD_LIBRARY_PATH=/opt/ompi/lib\n\
 source /opt/cp2k/tools/toolchain/install/setup\n\
 \"\$@\"" \
 >/usr/local/bin/entrypoint.sh && chmod 755 /usr/local/bin/entrypoint.sh
