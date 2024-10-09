@@ -139,7 +139,7 @@ jobs:
         sudo apt-get install -y openmpi-bin openmpi-common libopenmpi-dev
         which mpirun
         ldd `which mpirun`
-        apptainer exec ${{ env.tag }}:latest ldd /usr/local/bin/cp2k
+        apptainer exec ${{ env.tag }}:latest ldd /opt/cp2k/exe/local/cp2k.psmp|| true
     - name: test cpu image with apptainer
       if: ${{ (env.push_truefalse == 'true') && (matrix.gpu == 'cpu') }}
       run: |
