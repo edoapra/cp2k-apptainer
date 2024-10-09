@@ -156,13 +156,7 @@ dockerfile_generator_version="0.2"
 # Install required packages
 apt-get update -qq && apt-get install -qq --no-install-recommends \
 libhwloc15 librdmacm1 libnuma1 libevent-core-2.1-7 libevent-pthreads-2.1-7 libibverbs1 libslurm37 libgfortran5 \
-libnl-3-200 libnl-route-3-200 libgomp1 libnuma1 \
- libnuma-dev libslurm-dev \
-libpmix-bin libpmix-dev libpmix2 \
-libpmi2-0-dev libpmi0-dev  \
- libnl-3-dev  libnl-route-3-dev udev \
- librdmacm-dev librdmacm1 rdma-core libibverbs-dev  ibverbs-providers  \
- libhwloc-dev \
+ibverbs-providers \
 g++ gcc gfortran openssh-client python3 && rm -rf /var/lib/apt/lists/*
 
 # Install CP2K binaries
@@ -209,6 +203,14 @@ cd /mnt
 # Label docker image
 
 # EOF
+%environment
+export OMPI_DIR=/opt/ompi
+export SINGULARITY_OMPI_DIR=$OMPI_DIR
+export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
+export SINGULARITYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+#export OMP_NUM_THREADS=1
+export PATH=$OMPI_DIR/bin:$PATH
+export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
 %runscript
 cd /mnt
 exec /usr/local/bin/entrypoint.sh cp2k --help "$@"
