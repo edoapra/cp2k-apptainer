@@ -22,12 +22,9 @@ jobs:
           ompi:
             - 5.0.5
     steps:
-    - name: ompi version tag
-      run: |
-        myversion=ompi-${{ matrix.ompi }}
     - name: tag
       run: |
-        echo "tag=oras://ghcr.io/${{ github.repository }}/${{env.myversion}}-${{ matrix.cp2kversion}}" >> $GITHUB_ENV
+        echo "tag=oras://ghcr.io/${{ github.repository }}/ompi${{matrix.ompi}}-${{ matrix.cp2kversion}}" >> $GITHUB_ENV
     - name: echo-tag
       run: |
         echo ' the apptainer tag is ' '${{ env.tag }}'
