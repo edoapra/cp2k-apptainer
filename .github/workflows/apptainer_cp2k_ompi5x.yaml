@@ -21,15 +21,13 @@ jobs:
             - 2023.1
           ompi:
             - 5.0.5
-          elpa:
-            - N
     steps:
-    - name: exachem version tag
+    - name: ompi version tag
       run: |
-        myversion=.ompi-${{ matrix.ompi }}
+        myversion=ompi-${{ matrix.ompi }}
     - name: tag
       run: |
-        echo "tag=oras://ghcr.io/${{ github.repository }}/apptainer${{ matrix.cp2kversion}}" >> $GITHUB_ENV
+        echo "tag=oras://ghcr.io/${{ github.repository }}/${{env.myversion}}-${{ matrix.cp2kversion}}" >> $GITHUB_ENV
     - name: echo-tag
       run: |
         echo ' the apptainer tag is ' '${{ env.tag }}'

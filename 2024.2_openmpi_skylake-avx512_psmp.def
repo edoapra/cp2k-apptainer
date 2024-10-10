@@ -26,6 +26,10 @@ export `cat ./ompi.txt`\
 && export `cat ./CP2KVERSION.txt`\
 && echo OMPI is $OMPI \
 && echo CP2KVERSION is $CP2KVERSION \
+&& export cp2k_major=$(echo $CP2KVERSION | cut -d . -f1) \
+&& export cp2k_minor=$(echo $CP2KVERSION | cut -d . -f2) \
+&& echo cp2k_minor is $cp2k_minor \
+&& echo cp2k_major is $cp2k_major \
 && export OMPI_DIR=/opt/ompi\
 && export PATH=$OMPI_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
 && export LD_LIBRARY_PATH=$OMPI_DIR/lib \
@@ -36,7 +40,6 @@ export `cat ./ompi.txt`\
 && export ompi_prefix=openmpi-$OMPI\
 && echo ompi_prefix is $ompi_prefix \
 && export ompi_major=$(echo $OMPI | cut -d . -f1) \
-&& echo ompi_major is $ompi_major \
 && export ompi_minor=$(echo $OMPI | cut -d . -f2) \
 && echo ompi_minor is $ompi_minor \
 && echo ompi_major is $ompi_major \
@@ -107,12 +110,13 @@ $ompi_options \
 git clone --recursive -b support/v$CP2KVERSION https://github.com/cp2k/cp2k.git /opt/cp2k
 
 # Build CP2K toolchain for target CPU skylake-avx512
+if [ $cp2k_major -ge 2024]; then DEEPMD_ARG=--with-deepmd=no; fi
 mkdir -p /opt/cp2k/tools/toolchain
 cd /opt/cp2k/tools/toolchain
 /bin/bash -c -o pipefail \
 "./install_cp2k_toolchain.sh -j 8 \
 --install-all \
---enable-cuda=no --with-deepmd=no \
+--enable-cuda=no $DEEPMD_ARG \
 --target-cpu=skylake-avx512 \
 --with-cusolvermp=no \
 --with-gcc=system \
