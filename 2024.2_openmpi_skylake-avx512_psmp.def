@@ -2,6 +2,11 @@ Bootstrap: docker
 From: ubuntu:22.04 
 Stage: build
 
+%setup
+     bash -c "if [[ -z '${OMPI}' ]]; then echo 'OMPI=5.0.5 ' >> ${SINGULARITY_ROOTFS}/OMPI.txt ; else echo 'OMPI is ${OMPI}'; echo 'OMPI=${OMPI} ' >> ${SINGULARITY_ROOTFS}/ompi.txt ; fi"\
+&&     bash -c "if [[ -z '${CP2KVERSION}' ]]; then echo 'CP2KVERSION=2023.1 ' >> ${SINGULARITY_ROOTFS}/CP2KVERSION.txt ; else echo 'CP2KVERSION is ${CP2KVERSION}'; echo 'CP2KVERSION=${CP2KVERSION} ' >> ${SINGULARITY_ROOTFS}/CP2KVERSION.txt ; fi"\
+
+
 %post
 #
 # This file was created by generate_docker_files.py
@@ -17,7 +22,10 @@ g++ gcc gfortran openssh-client python3 \
 bzip2 ca-certificates git make patch pkg-config unzip wget zlib1g-dev rsync
 
 # install OpenMPI
-export OMPI=5.0.5 \
+export `cat ./ompi.txt`\
+&& export `cat ./CP2KVERSION.txt`\
+&& echo OMPI is $OMPI \
+&& echo CP2KVERSION is $CP2KVERSION \
 && export OMPI_DIR=/opt/ompi\
 && export PATH=$OMPI_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
 && export LD_LIBRARY_PATH=$OMPI_DIR/lib \
@@ -96,7 +104,7 @@ $ompi_options \
 && export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
 
 # Download CP2K
-git clone --recursive -b support/v2024.2 https://github.com/cp2k/cp2k.git /opt/cp2k
+git clone --recursive -b support/v$CP2KVERSION https://github.com/cp2k/cp2k.git /opt/cp2k
 
 # Build CP2K toolchain for target CPU skylake-avx512
 mkdir -p /opt/cp2k/tools/toolchain
@@ -114,6 +122,7 @@ cd /opt/cp2k/tools/toolchain
 # Build CP2K for target CPU skylake-avx512
 mkdir -p /opt/cp2k
 cd /opt/cp2k
+cp /CP2KVERSION.txt /opt/
 /bin/bash -c -o pipefail \
 "cp ./tools/toolchain/install/arch/local.psmp ./arch/; \
 source ./tools/toolchain/install/setup; \
@@ -149,7 +158,7 @@ Stage: install
 /opt/ompi/ /opt/ompi/
 %labels
 author="CP2K Developers" 
-cp2k_version="2024.2" 
+cp2k_version=$CP2KVERSION
 dockerfile_generator_version="0.2"
 %post
 

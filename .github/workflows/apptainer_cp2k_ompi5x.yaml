@@ -16,7 +16,9 @@ jobs:
         fail-fast: false
         matrix:
           cp2kversion:
+            - 2024.3
             - 2024.2
+            - 2023.1
           ompi:
             - 5.0.5
           elpa:
@@ -25,12 +27,9 @@ jobs:
     - name: exachem version tag
       run: |
         myversion=.ompi-${{ matrix.ompi }}
-        if [[ ${{ matrix.elpa }} ==  Y ]]; then
-          echo "elpa=.elpa" >> $GITHUB_ENV
-        fi
     - name: tag
       run: |
-        echo "tag=oras://ghcr.io/${{ github.repository }}/apptainer${{ env.cp2kversion}}${{ env.elpa}}" >> $GITHUB_ENV
+        echo "tag=oras://ghcr.io/${{ github.repository }}/apptainer${{ matrix.cp2kversion}}" >> $GITHUB_ENV
     - name: echo-tag
       run: |
         echo ' the apptainer tag is ' '${{ env.tag }}'
@@ -67,7 +66,7 @@ jobs:
       with:
         path: |
           ~/cache
-        key: cp2kcache-v001
+        key: cp2kcache-v001-${{ matrix.cp2kversion}}
     - name: fetch cache
       if: steps.setup-cache.outputs.cache-hit == 'true'
       run: |
@@ -94,7 +93,7 @@ jobs:
         fi
     - name: build an apptainer container
       run: |
-        MYUSERNAME=${{ github.actor}} GPU=${{ matrix.gpu}}  ELPA=${{ matrix.elpa}} OMPI=${{ matrix.ompi }} apptainer build --fakeroot cp2k.img   2024.2_openmpi_skylake-avx512_psmp.def
+        MYUSERNAME=${{ github.actor}} GPU=${{ matrix.gpu}}  CP2KVERSION=${{ matrix.cp2kversion}} OMPI=${{ matrix.ompi }} apptainer build --fakeroot cp2k.img   2024.2_openmpi_skylake-avx512_psmp.def
     - name: builddate
       id: build-date
       run: |
